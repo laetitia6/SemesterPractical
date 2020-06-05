@@ -1,0 +1,313 @@
+#include "branch_and_bound.h"
+#include <iostream>
+#include <map>
+#include <limits>
+#include "matrix.h"
+#include "simplex.h"
+#include <math.h> //-to use floor
+
+
+// The idea is to test the smaller than and bigger than of each variable that was not a whole number,
+// The order of changing variables should be in a BFS method
+// I must make sure to implement the stop function for when a valid answer is found and the z is too small.
+
+// To do this. I will need to understand how I will be able to build a tree. Using nodes and connecting them
+
+void Branch_and_Bound::Copy_matrix_wrt_rows(Matrix<double> &New, Matrix<double> &Old, const int r,const int c)
+{
+    for(int i=0; i< r ;i++)
+    {
+        for(int j = 0; j< c; j++)
+        {
+            New.put(i,j, Old.get(i,j));
+            //cout<< i<< ": \n"<< New <<endl;
+        }
+    }
+}
+void Branch_and_Bound::Copy_matrix_Single_Vertical(Matrix<double> &New, Matrix<double> &Old, const int old_size)//grootte itv rye...moet ou waarde ontvang
+{
+    for(int i = 0; i< old_size; i++)
+    {
+        New.put(i,0,Old.get(i,0));
+        //cout<< i<< ": \n"<< New <<endl;
+    }
+
+}
+void Branch_and_Bound::Copy_matrix_Single_Horisontal(Matrix<double> &New, Matrix<double> &Old, const int x)
+{
+    for(int i = 0; i< x; i++)
+    {
+        New.put(0,i,Old.get(0,i));
+        //cout<< i<< ": \n"<< New <<endl;
+    }
+}
+void Branch_and_Bound::New_Placeholders(Matrix<double> &Placeholder_N, Matrix<double> &Placeholder_B,double r, double c)
+{
+    for(int i=0; i< c-r; i++)
+    {
+        Placeholder_N.put(0,i,i);
+    }
+    for(int i=0; i< r; i++)
+    {
+        Placeholder_B.put(0,i,c-r+i);
+    }
+}
+
+
+
+
+Branch_and_Bound::Branch_and_Bound(Matrix<double> &B, Matrix<double> &N, Matrix<double> &b, Matrix<double> &X_B,Matrix<double> &X_N,
+                                   Matrix<double> &C_N, Matrix<double> &C_B, const int &r, const int &c,Matrix<double> Objective_function,
+                                   Matrix<double> Lower, Matrix<double> Upper,Matrix<double> &Placeholder)
+
+{
+    //Logic to ensure that Xa < #1  and Xa < #2 does not occur.
+    // But first i will assume that it only does not work for when X<=0 constraint
+    // Test: will show me which nodes needs branched.
+
+
+    /*----------------------Find Constraint position in colums in begin X------------------------------------*/
+
+    double Constraint_position= -1; // aka Furthest_from_floor//afgerond
+    double temp1, temp2 =0;
+    cout<<" X_B obtained: \n"<< X_B<<endl;
+    for(int i=0; i< r; i ++) //i=counter for loop //r = rows
+    {
+        temp1 = floor(X_B.get(i,0)); //floor rond die waardes af vanaf X_B verkry
+        if( temp1 != X_B.get(i,0) )//wanneer die waarde nie gelyk is aan die afgeronde waarde nie gaan in loop in. Dus 0,555 gaan in loop in want kan nie gelyk ewees aan 'n afgeronde waarde nie //wanneer waarde integer is, gaan in loop in
+           {
+            temp1 = X_B.get(i,0) -floor(X_B.get(i,0));
+            if(temp1 >= temp2) //grootste integer value
+            {
+                temp2 = temp1;
+                Constraint_position = i;// column posisie van constraint... moet seker maak constraint posisie nie slack nie... incode// is constraint een van x waardes
+            }
+            }
+    }
+     cout<<"Constraint_position\t"<< Constraint_position <<endl;
+     double Real_constraint_position;//constraints
+     cout<<"Placeholder\t"<< Placeholder <<endl;
+     Real_constraint_position = Placeholder.get(0,Constraint_position);// xwaarde wil verander
+     cout<<"Real_constraint_position (in colums)\t"<< Real_constraint_position <<endl;
+
+     // Add Logic for smaller first!!!!!!
+
+     int Smaller_val = 0; //afrond
+     int Bigger_val = 0; //oprond
+     int new_r = r+1;//constraint by
+     int new_c = c+1;//column by
+
+
+     Smaller_val = floor(X_B.get(Constraint_position,0)); //kleiner x-waarde (floor = heelgetal)
+     Bigger_val = floor(X_B.get(Constraint_position,0)) +1;//groter x-waarde (floor = heelgetal)
+     cout<<"Smaller_val: "<< Smaller_val<< " Bigger_val: "<< Bigger_val<<endl;
+
+
+     //==============================================================================================================================================
+     //                                            SMALLER BEGINS
+     //==============================================================================================================================================
+
+    //-------------------Add constraints and update matrixes for new Simplex__________________________________
+
+
+     /*----------------------------Check too see if there is allready a constraint that has a X < #any_value# going through every row----*/
+     // Hier begin die kak!
+  /*
+     int Alone_constraint_in_row = 0;        //True
+     int Real_constraint_position_row = -1;   //False
+     //cout<<N<<endl;
+     int found =0;
+     for(int i =0;i< r;i++) // N:(m x n-m)
+     {
+         Alone_constraint_in_row = 0; // Set to false for each new row
+
+         for( int j = 0; j<c-r; j++)
+         {
+             if( j != Real_constraint_position)
+             {
+                 if( N.get(i,j) != 0 || Alone_constraint_in_row != 0  )
+                    {
+                     Alone_constraint_in_row = 1; // False
+                    }
+             }
+         }
+         if(Alone_constraint_in_row == 0) // Meaning still true
+         {
+            Real_constraint_position_row = i;
+            found =1;                     // Meaning found a row where variable is alone
+         }
+    }
+         cout<<"Real_constraint_position_row: "<<Real_constraint_position_row<<endl;
+         cout<<"Found: \t"<< found<<endl;
+*/
+      //-----------------------IF STATEMENT-----------------------
+     /*if(Smaller_val == 0 && found == 1)
+     {
+         // Then dont add a constraint but rather set constraint to = 0
+
+         // now change value in b
+         Matrix<double> newb(1,r);
+         newb = b;
+         newb.put(Real_constraint_position_row,0,Smaller_val); // must be row
+         cout<<"newb\n"<< newb <<endl;
+
+
+         // Set up this Simplex my broe:
+         Matrix<double> copyB(r,r);          copyB = B;
+         cout<< Real_constraint_position_row<<endl;
+         copyB.put(Real_constraint_position_row,Real_constraint_position_row,0); // This eliminates the slack variable
+         cout<<copyB<<endl;
+         Matrix<double> copyN(r, c-r);       copyN = N;
+         Matrix<double> copyb(r,1);          copyb = b;
+         Matrix<double> copyX_B(r,1);        copyX_B = X_B;
+         Matrix<double> copyX_N(c-r,1);      copyX_N = X_N;
+         Matrix<double> copyC_N(1,c-r);      copyC_N = C_N;
+         Matrix<double> copyC_B(1,r);        copyC_B = C_B;
+         Matrix<double> Placeholder_N(1,c-r); //Matrix<double> C_N(1,c-r);
+            //cout<<" werk tot hier 33\n";
+         for(int i=0; i< c-r; i++)
+         {
+             Placeholder_N.put(0,i,i);
+         }
+
+         Matrix<double> Placeholder_B(1,r); //Matrix<double> C_B(1,r); // Shows position from 0
+         for(int i=0; i< r; i++)
+         {
+             Placeholder_B.put(0,i,r-1+i);
+         }
+         int stop =0;
+         int forcestop = 0;
+         while(stop ==0 && forcestop < 5 )
+         {
+             Simplex(copyB,copyN,newb,copyX_B,copyX_N,copyC_N,copyC_B,r,c,stop,forcestop,Objective_function,Placeholder_N,Placeholder_B);
+             cout<<copyX_B<<endl;
+         }
+
+         // >>Need to insert recursive B&B<<
+         //cout<<" werk tot hier jha11111 1111  1111\n";
+         }
+         */
+     //else{ /*----------------------------Normal conditions-----------------------------*/
+         cout<<"Cant test it right now..................."<<endl;
+         // Update b,N,B,X_B,X_N,C_B,C_N
+         Matrix<double> newb(new_r,1); //hoeveel kolomme in b=1
+         Copy_matrix_Single_Vertical(newb,b,r);
+         newb.put(new_r-1,0,Smaller_val+0.000000001);//put en get begin tel van 0 af
+         cout<<"newb:\n"<<newb<<endl;
+
+         Matrix<double> newN(new_r,new_c-new_r);
+         Copy_matrix_wrt_rows(newN,N,r,new_c-new_r);
+         newN.put(new_r-1,Real_constraint_position,1);
+         cout<<"newN:\n"<<newN<<endl;
+
+         Matrix<double> newB(new_r,new_r);
+         IdentityMatrix<double> I(new_r,new_r);
+         newB = I;//identeitsmatriks
+         cout<<"newB :\n" << newB<<endl;
+
+         Matrix<double> newX_B(new_r,1);
+         Matrix<double> newX_N(new_c-new_r,1);
+         cout<<"newX_B :\n" << newX_B<<endl;
+         cout<<"newX_N :\n" << newX_N<<endl;
+
+
+         Matrix<double> newC_B(1,new_r);//gelyk aan 0'e
+
+         Copy_matrix_Single_Horisontal(newC_B,C_B,r);//automaties 0,,, nie copy iets wat 0 is nie
+         cout<<"newC_B :\n" << newC_B<<endl;
+
+         Matrix<double> newC_N(1,new_c-new_r);
+         Copy_matrix_Single_Horisontal(newC_N,C_N,new_c-new_r);
+         cout<<"newC_N :\n" << newC_N<<endl;
+
+         Matrix<double> Placeholder_N(1,new_c-new_r);
+         Matrix<double> Placeholder_B(1,new_r);
+         New_Placeholders(Placeholder_N,Placeholder_B,new_r,new_c);
+         //cout<< Placeholder_N<<Placeholder_B;
+
+         int stop =0;
+         int forcestop = 0;
+         while(stop ==0 && forcestop < 100 )
+         { cout<<">";
+             Simplex(newB,newN,newb,newX_B,newX_N,newC_N,newC_B,new_r,new_c,stop,forcestop,Objective_function,Placeholder_N,Placeholder_B);
+         }
+         // >>Need to insert recursive B&B<<
+     //}
+     cout<<"Grondboontjie"<<endl;
+
+//==============================================================================================================================================
+//         BIGGER BEGINS
+//==============================================================================================================================================
+/*
+    Matrix<double> Placeholder_N(1,new_c-new_r); //Matrix<double> C_N(1,c-r);
+    for(int i=0; i< new_c-new_r; i++)
+    {
+        Placeholder_N.put(0,i,i+1);
+    }
+
+    Matrix<double> Placeholder_B(1,new_r); //Matrix<double> C_B(1,r);
+    for(int i=0; i< new_r; i++)
+    {
+        Placeholder_B.put(0,i,new_r+i);
+    }
+    //cout<<"Placeholder_N "<<Placeholder_N<<endl;
+    //cout<<"Placeholder_B "<<Placeholder_B<<endl;
+
+
+    // Add new constraint to matrix -N-
+    Matrix<double> newN(new_r,new_c-new_r); //(m x n-m)
+    Copy_matrix_wrt_rows(newN, N, r,c);
+    newN.put(r,1,1);// //////////////X2
+    cout<< "NewN:\n"<<newN<<endl;
+
+    // Add new value to -b- correponding to constraint in N
+    Matrix<double> newb(new_r,1);
+    Copy_matrix_Single_Vertical(newb, b, r);
+    cout<< "Newb:\n"<<newb<<endl;
+
+    //Update slack variables in -B-
+    IdentityMatrix<double> I(new_r,new_r);
+    Matrix<double> newB(new_r,new_r);
+    newB = I;
+    newB.put(new_r-1,new_r-1,0);
+    cout<< "newB:\n"<<newB<<endl;
+
+    //Update -C_B- gets bigger
+    Matrix<double> newC_B(1,new_r);
+    //Copy_matrix_Single_Horisontal(newC_B,C_B,r);
+//    cout<< "newC_B:\n"<<newC_B<<endl;
+
+    //Update  C_N
+    // C_N doe snot change, hence use old C_N
+    //Matrix<double> newC_N(1,new_c-new_r);
+
+    //Copy_matrix_Single_Horisontal(newC_N,C_N,new_c-new_r);
+    //cout<< "newC_N:\n"<<newC_N<<endl;
+
+
+    // Matrices that changes only in size
+    Matrix<double> newX_B(new_r,1);
+//    cout<< "newX_B:\n"<<newX_B<<endl;
+    Matrix<double> newX_N(new_c-new_r,1);
+    Copy_matrix_Single_Vertical(newX_N,X_N, new_c-new_r);
+//    cout<< "newX_N:\n"<<newX_N<<endl;
+
+
+    int stop = 0;
+    int forcestop =0;
+    while(stop ==0 && forcestop < 10 )
+    {
+        Simplex(newB,newN,newb,newX_B,newX_N,C_N,newC_B,new_r,new_c,stop,forcestop,Objective_function,Placeholder_N,Placeholder_B);
+        //cout<<forcestop<<"  Objective function:\n"<< Objective_function<<endl;
+    }
+    */
+    /*
+    cout<<"newB:\n"<< newB <<endl;
+    cout<<"newN:\n"<< newN <<endl;
+    cout<<"newb:\n"<< newb <<endl;
+    cout<<"newX_B:\n"<< newX_B <<endl;
+    cout<<"newX_N:\n"<< newX_N <<endl;
+    cout<<"newC_B:\n"<< newC_B <<endl;
+    */
+}
+
